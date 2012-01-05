@@ -75,15 +75,38 @@ static int is_git_calling_us(FILE * terminal)
 	pid_t parent_pid = getppid();
 	struct kinfo_proc * processes = NULL;
 	size_t size = 0;
+	size_t process_count = 0;
 
 	if (sysctl(name, 3, NULL, &size, NULL, 0) != 0) fatal("sysctl failed", terminal);
 	if ((processes = malloc(size)) == NULL) fatal("unable to allocate memory", terminal);
 	if (sysctl(name, 3, processes, &size, NULL, 0) != 0) fatal("sysctl failed", terminal);
 
-	for (int i = 0; i < size / sizeof(struct kinfo_proc); i++)
-	{
-		struct extern_proc process = processes[i].kp_proc;
-		if (parent_pid == process.p_pid && strcmp(process.p_comm, "git-remote-https") == 0) return 1;
+	process_count = size / sizeof(*processes);
+
+	while (parent_pid && parent_pid != 1) {
+		int found = 0;
+
+		for (int i = 0; i < process_count; i++) {
+			struct extern_proc process = processes[i].kp_proc;
+			if (parent_pid == process.p_pid) {
+				found = 1;
+				struct kinfo_proc info;
+				size = sizeof(info);
+				int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, parent_pid };
+				if (sysctl(mib, 4, &info, &size, NULL, 0) != 0)
+					fatal("sysctl PROC_PID failed", terminal);
+				parent_pid = info.kp_eproc.e_ppid;
+
+				if (strcmp(process.p_comm, "git") == 0)
+					return 1;
+
+				break;
+			}
+		}
+
+		if (!found) {
+			break;
+		}
 	}
 
 	return 0;
@@ -254,11 +277,16 @@ int main(int argc, const char * argv[])
 {
 	FILE * terminal = fdopen(2, "r+");
 
-	if (!is_git_calling_us(terminal)) fatal("can only be used by git", terminal);
-	if (argc != 2) fatal("can only be used by git", terminal);
-	if (strcmp(argv[1], "Username: ") == 0) printf("%s", get_username(terminal));
-	else if (strcmp(argv[1], "Password: ") == 0) printf("%s", get_password(terminal));
-	else fatal("can only be used by git", terminal);
+	if (!is_git_calling_us(terminal))
+		fatal("can only be used by git", terminal);
+	if (argc != 2)
+		fatal("can only be used by git", terminal);
+	if (strcmp(argv[1], "Username: ") == 0)
+		printf("%s", get_username(terminal));
+	else if (strcmp(argv[1], "Password: ") == 0)
+		printf("%s", get_password(terminal));
+	else
+		fatal("can only be used by git", terminal);
 
 	return 0;
 }
