@@ -140,7 +140,7 @@ static char * git_origin_url(FILE * terminal)
 	return git_config("remote.origin.url", terminal);
 }
 
-static struct KeyChainItem
+struct KeyChainItem
 {
 	char * username;
 	char * password;
