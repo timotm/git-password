@@ -236,9 +236,25 @@ static char * prompt(char * prompt)
 	return value;
 }
 
+static char * trim_repository(char * repository)
+{
+	char *first_slash = NULL;
+
+	if (strlen(repository) > strlen("https://")) {
+		first_slash = strchr(repository + strlen("https://"), '/');
+	}
+
+	if (first_slash) {
+		*(first_slash+1) = '\0';
+	}
+
+	return repository;
+}
+
+
 static char * get_username(FILE * terminal)
 {
-	char * repository = git_origin_url(terminal), * username = NULL, * password = NULL;
+	char * repository = trim_repository(git_origin_url(terminal)), * username = NULL, * password = NULL;
 	KeyChainItem * item = find_keychain_item(repository, false, terminal);
 
 	if (item)
@@ -257,7 +273,7 @@ static char * get_username(FILE * terminal)
 
 static char * get_password(FILE * terminal)
 {
-	char * repository = git_origin_url(terminal), * password = NULL;
+	char * repository = trim_repository(git_origin_url(terminal)), * password = NULL;
 	KeyChainItem * item = find_keychain_item(repository, true, terminal);
 
 	if (item)
